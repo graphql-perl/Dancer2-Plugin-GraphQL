@@ -5,7 +5,6 @@ MANIFEST
 t/00-compile.t
 t/00-report-prereqs.t
 t/ajax.t
-t/author-pod-syntax.t
 xt/manifest.t
 xt/pod-coverage.t
 xt/pod.t
