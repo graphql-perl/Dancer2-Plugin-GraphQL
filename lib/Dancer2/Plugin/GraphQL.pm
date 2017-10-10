@@ -2,65 +2,71 @@ package Dancer2::Plugin::GraphQL;
 # ABSTRACT: a plugin for adding GraphQL route handlers
 use strict;
 use warnings;
-use Dancer2::Core::Types 'Str';
+use Dancer2::Core::Types qw(Bool);
 use Dancer2::Plugin;
+use GraphQL::Execution;
 
-our $VERSION = '0.300000';
+our $VERSION = '0.01';
 
-has content_type => (
+has graphiql => (
     is => 'ro',
-    isa => Str,
-    from_config => sub { 'text/xml' },
+    isa => Bool,
+    from_config => sub { '' },
 );
 
-plugin_keywords 'ajax';
+my @DEFAULT_METHODS = qw(get post);
+my $TEMPLATE = join '', <DATA>;
 
-sub ajax {
-    my ( $plugin, $pattern, @rest ) = @_;
+my $JSON = JSON::MaybeXS->new->utf8->allow_nonref;
+sub _safe_serialize {
+    my $data = shift or return 'undefined';
+    my $json = $JSON->encode( $data );
+    $json =~ s#/#\\/#g;
+    return $json;
+}
 
-    my @default_methods = ( 'get', 'post' );
-
-    # If the given pattern is an ArrayRef, we override the default methods
-    if( ref($pattern) eq "ARRAY" ) {
-        @default_methods = @$pattern;
-        $pattern = shift(@rest);
-    }
-
-    my $code;
-    for my $e (@rest) { $code = $e if ( ref($e) eq 'CODE' ) }
-
+plugin_keywords graphql => sub {
+    my ( $plugin, $pattern, $schema, $root_value, $field_resolver ) = @_;
     my $ajax_route = sub {
-
-        # # must be an XMLHttpRequest
-        if ( not $plugin->app->request->is_ajax ) {
-            $plugin->app->pass;
+        my ($app) = @_;
+        if (
+            $plugin->graphiql and
+            ($app->request->header('Accept')//'') eq 'text/html' and
+            !defined $app->request->params->{raw}
+        ) {
+            # disable layout
+            my $layout = $app->config->{'layout'};
+            $app->config->{'layout'} = undef;
+            my $result = $app->template(\$TEMPLATE, {
+                title            => 'GraphiQL',
+                graphiql_version => '0.11.2',
+                queryString      => _safe_serialize( $app->request->params->{'query'} ),
+                operationName    => _safe_serialize( $app->request->params->{'operationName'} ),
+                resultString     => _safe_serialize( $app->request->params->{'result'} ),
+                variablesString  => _safe_serialize( $app->request->params->{'variables'} ),
+            });
+            $app->config->{'layout'} = $layout;
+            $app->send_as(html => $result);
         }
-
-        # Default response content type is either what's defined in the
-        # plugin setting or text/xml
-        $plugin->app->response->header('Content-Type')
-          or $plugin->app->response->content_type( $plugin->content_type );
-
-        # disable layout
-        my $layout = $plugin->app->config->{'layout'};
-        $plugin->app->config->{'layout'} = undef;
-        my $response = $code->();
-        $plugin->app->config->{'layout'} = $layout;
-        return $response;
+        my $body = $JSON->decode($app->request->body);
+        $app->send_as(JSON => GraphQL::Execution->execute(
+            $schema,
+            $body->{'query'},
+            $root_value,
+            $app->request->headers,
+            $body->{'variables'},
+            $body->{'operationName'},
+            $field_resolver,
+        ));
     };
-
-    foreach my $method ( @default_methods ) {
+    foreach my $method (@DEFAULT_METHODS) {
         $plugin->app->add_route(
             method => $method,
             regexp => $pattern,
             code   => $ajax_route,
         );
     }
-}
-
-1;
-
-__END__
+};
 
 =pod
 
@@ -70,33 +76,53 @@ __END__
 
 Dancer2::Plugin::GraphQL - a plugin for adding GraphQL route handlers
 
-=head1 VERSION
-
-version 0.300000
-
 =head1 SYNOPSIS
 
     package MyWebApp;
 
     use Dancer2;
     use Dancer2::Plugin::GraphQL;
+    use GraphQL::Schema;
+    use GraphQL::Type::Object;
+    use GraphQL::Type::Scalar qw/ $String /;
 
-    # For GET / POST
-    ajax '/check_for_update' => sub {
-        # ... some Ajax code
-    };
-
-    # For all valid HTTP methods
-    ajax ['get', 'post', ... ] => '/check_for_more' => sub {
-        # ... some Ajax code
-    };
+    my $schema = GraphQL::Schema->new(
+        query => GraphQL::Type::Object->new(
+            name => 'QueryRoot',
+            fields => {
+                helloWorld => {
+                    type => $String,
+                    resolve => sub { 'Hello, world!' },
+                },
+            },
+        ),
+    );
+    graphql '/graphql' => $schema;
 
     dance;
 
 =head1 DESCRIPTION
 
-The C<ajax> keyword which is exported by this plugin allow you to define a route
-handler optimized for GraphQL queries.
+The C<graphql> keyword which is exported by this plugin allow you to
+define a route handler implementing a GraphQL endpoint.
+
+Parameters, after the route pattern:
+
+=over 4
+
+=item $schema
+
+A L<GraphQL::Schema> object.
+
+=item $root_value
+
+An optional root value, passed to top-level resolvers.
+
+=item $field_resolver
+
+An optional field resolver, replacing the GraphQL default.
+
+=back
 
 The route handler code will be compiled to behave like the following:
 
@@ -104,28 +130,28 @@ The route handler code will be compiled to behave like the following:
 
 =item *
 
-Pass if the request header X-Requested-With doesn't equal XMLHttpRequest
+Passes to the L<GraphQL> execute, the given schema, C<$root_value> and C<$field_resolver>.
 
 =item *
 
-Disable the layout
+The action built matches POST / GET requests.
 
 =item *
 
-The action built matches POST / GET requests by default. This can be extended by passing it an ArrayRef of allowed HTTP methods.
+Returns GraphQL results in JSON form.
 
 =back
 
 =head1 CONFIGURATION
 
-By default the plugin will use a content-type of 'text/xml' but this can be overridden
-with plugin setting 'content_type'.
+By default the plugin will not return GraphiQL, but this can be overridden
+with plugin setting 'graphiql', to true.
 
-Here is example to use JSON:
+Here is example to use GraphiQL:
 
   plugins:
     GraphQL:
-      content_type: 'application/json'
+      graphiql: true
 
 =head1 AUTHOR
 
@@ -139,3 +165,125 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
+
+1;
+
+__DATA__
+<!--
+Copied from https://github.com/graphql/express-graphql/blob/master/src/renderGraphiQL.js
+Converted to use the simple template to capture the CGI args
+-->
+<!--
+The request to this GraphQL server provided the header "Accept: text/html"
+and as a result has been presented GraphiQL - an in-browser IDE for
+exploring GraphQL.
+If you wish to receive JSON, provide the header "Accept: application/json" or
+add "&raw" to the end of the URL within a browser.
+-->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>GraphiQL</title>
+  <meta name="robots" content="noindex" />
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      width: 100%;
+    }
+  </style>
+  <link href="//cdn.jsdelivr.net/npm/graphiql@<% graphiql_version %>/graphiql.css" rel="stylesheet" />
+  <script src="//cdn.jsdelivr.net/fetch/0.9.0/fetch.min.js"></script>
+  <script src="//cdn.jsdelivr.net/react/15.4.2/react.min.js"></script>
+  <script src="//cdn.jsdelivr.net/react/15.4.2/react-dom.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/graphiql@<% graphiql_version %>/graphiql.min.js"></script>
+</head>
+<body>
+  <script>
+    // Collect the URL parameters
+    var parameters = {};
+    window.location.search.substr(1).split('&').forEach(function (entry) {
+      var eq = entry.indexOf('=');
+      if (eq >= 0) {
+        parameters[decodeURIComponent(entry.slice(0, eq))] =
+          decodeURIComponent(entry.slice(eq + 1));
+      }
+    });
+    // Produce a Location query string from a parameter object.
+    function locationQuery(params) {
+      return '?' + Object.keys(params).filter(function (key) {
+        return Boolean(params[key]);
+      }).map(function (key) {
+        return encodeURIComponent(key) + '=' +
+          encodeURIComponent(params[key]);
+      }).join('&');
+    }
+    // Derive a fetch URL from the current URL, sans the GraphQL parameters.
+    var graphqlParamNames = {
+      query: true,
+      variables: true,
+      operationName: true
+    };
+    var otherParams = {};
+    for (var k in parameters) {
+      if (parameters.hasOwnProperty(k) && graphqlParamNames[k] !== true) {
+        otherParams[k] = parameters[k];
+      }
+    }
+    var fetchURL = locationQuery(otherParams);
+    // Defines a GraphQL fetcher using the fetch API.
+    function graphQLFetcher(graphQLParams) {
+      return fetch(fetchURL, {
+        method: 'post',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(graphQLParams),
+        credentials: 'include',
+      }).then(function (response) {
+        return response.text();
+      }).then(function (responseBody) {
+        try {
+          return JSON.parse(responseBody);
+        } catch (error) {
+          return responseBody;
+        }
+      });
+    }
+    // When the query and variables string is edited, update the URL bar so
+    // that it can be easily shared.
+    function onEditQuery(newQuery) {
+      parameters.query = newQuery;
+      updateURL();
+    }
+    function onEditVariables(newVariables) {
+      parameters.variables = newVariables;
+      updateURL();
+    }
+    function onEditOperationName(newOperationName) {
+      parameters.operationName = newOperationName;
+      updateURL();
+    }
+    function updateURL() {
+      history.replaceState(null, null, locationQuery(parameters));
+    }
+    // Render <GraphiQL /> into the body.
+    ReactDOM.render(
+      React.createElement(GraphiQL, {
+        fetcher: graphQLFetcher,
+        onEditQuery: onEditQuery,
+        onEditVariables: onEditVariables,
+        onEditOperationName: onEditOperationName,
+        query: <% queryString %>,
+        response: <% resultString %>,
+        variables: <% variablesString %>,
+        operationName: <% operationName %>,
+      }),
+      document.body
+    );
+  </script>
+</body>
+</html>
