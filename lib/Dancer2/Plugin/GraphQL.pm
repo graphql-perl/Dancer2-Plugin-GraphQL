@@ -9,9 +9,9 @@ use GraphQL::Execution;
 our $VERSION = '0.01';
 
 has graphiql => (
-    is => 'ro',
-    isa => Bool,
-    from_config => sub { '' },
+  is => 'ro',
+  isa => Bool,
+  from_config => sub { '' },
 );
 
 my @DEFAULT_METHODS = qw(get post);
@@ -19,53 +19,53 @@ my $TEMPLATE = join '', <DATA>;
 
 my $JSON = JSON::MaybeXS->new->utf8->allow_nonref;
 sub _safe_serialize {
-    my $data = shift or return 'undefined';
-    my $json = $JSON->encode( $data );
-    $json =~ s#/#\\/#g;
-    return $json;
+  my $data = shift or return 'undefined';
+  my $json = $JSON->encode( $data );
+  $json =~ s#/#\\/#g;
+  return $json;
 }
 
 plugin_keywords graphql => sub {
-    my ( $plugin, $pattern, $schema, $root_value, $field_resolver ) = @_;
-    my $ajax_route = sub {
-        my ($app) = @_;
-        if (
-            $plugin->graphiql and
-            ($app->request->header('Accept')//'') eq 'text/html' and
-            !defined $app->request->params->{raw}
-        ) {
-            # disable layout
-            my $layout = $app->config->{'layout'};
-            $app->config->{'layout'} = undef;
-            my $result = $app->template(\$TEMPLATE, {
-                title            => 'GraphiQL',
-                graphiql_version => '0.11.2',
-                queryString      => _safe_serialize( $app->request->params->{'query'} ),
-                operationName    => _safe_serialize( $app->request->params->{'operationName'} ),
-                resultString     => _safe_serialize( $app->request->params->{'result'} ),
-                variablesString  => _safe_serialize( $app->request->params->{'variables'} ),
-            });
-            $app->config->{'layout'} = $layout;
-            $app->send_as(html => $result);
-        }
-        my $body = $JSON->decode($app->request->body);
-        $app->send_as(JSON => GraphQL::Execution->execute(
-            $schema,
-            $body->{'query'},
-            $root_value,
-            $app->request->headers,
-            $body->{'variables'},
-            $body->{'operationName'},
-            $field_resolver,
-        ));
-    };
-    foreach my $method (@DEFAULT_METHODS) {
-        $plugin->app->add_route(
-            method => $method,
-            regexp => $pattern,
-            code   => $ajax_route,
-        );
+  my ( $plugin, $pattern, $schema, $root_value, $field_resolver ) = @_;
+  my $ajax_route = sub {
+    my ($app) = @_;
+    if (
+      $plugin->graphiql and
+      ($app->request->header('Accept')//'') eq 'text/html' and
+      !defined $app->request->params->{raw}
+    ) {
+      # disable layout
+      my $layout = $app->config->{'layout'};
+      $app->config->{'layout'} = undef;
+      my $result = $app->template(\$TEMPLATE, {
+        title            => 'GraphiQL',
+        graphiql_version => '0.11.2',
+        queryString      => _safe_serialize( $app->request->params->{'query'} ),
+        operationName    => _safe_serialize( $app->request->params->{'operationName'} ),
+        resultString     => _safe_serialize( $app->request->params->{'result'} ),
+        variablesString  => _safe_serialize( $app->request->params->{'variables'} ),
+      });
+      $app->config->{'layout'} = $layout;
+      $app->send_as(html => $result);
     }
+    my $body = $JSON->decode($app->request->body);
+    $app->send_as(JSON => GraphQL::Execution->execute(
+      $schema,
+      $body->{'query'},
+      $root_value,
+      $app->request->headers,
+      $body->{'variables'},
+      $body->{'operationName'},
+      $field_resolver,
+    ));
+  };
+  foreach my $method (@DEFAULT_METHODS) {
+    $plugin->app->add_route(
+      method => $method,
+      regexp => $pattern,
+      code   => $ajax_route,
+    );
+  }
 };
 
 =pod
@@ -78,28 +78,28 @@ Dancer2::Plugin::GraphQL - a plugin for adding GraphQL route handlers
 
 =head1 SYNOPSIS
 
-    package MyWebApp;
+  package MyWebApp;
 
-    use Dancer2;
-    use Dancer2::Plugin::GraphQL;
-    use GraphQL::Schema;
-    use GraphQL::Type::Object;
-    use GraphQL::Type::Scalar qw/ $String /;
+  use Dancer2;
+  use Dancer2::Plugin::GraphQL;
+  use GraphQL::Schema;
+  use GraphQL::Type::Object;
+  use GraphQL::Type::Scalar qw/ $String /;
 
-    my $schema = GraphQL::Schema->new(
-        query => GraphQL::Type::Object->new(
-            name => 'QueryRoot',
-            fields => {
-                helloWorld => {
-                    type => $String,
-                    resolve => sub { 'Hello, world!' },
-                },
-            },
-        ),
-    );
-    graphql '/graphql' => $schema;
+  my $schema = GraphQL::Schema->new(
+    query => GraphQL::Type::Object->new(
+      name => 'QueryRoot',
+      fields => {
+        helloWorld => {
+          type => $String,
+          resolve => sub { 'Hello, world!' },
+        },
+      },
+    ),
+  );
+  graphql '/graphql' => $schema;
 
-    dance;
+  dance;
 
 =head1 DESCRIPTION
 
