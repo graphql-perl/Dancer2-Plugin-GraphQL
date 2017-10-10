@@ -31,7 +31,7 @@ plugin_keywords graphql => sub {
     my ($app) = @_;
     if (
       $plugin->graphiql and
-      ($app->request->header('Accept')//'') eq 'text/html' and
+      ($app->request->header('Accept')//'') =~ /^text\/html\b/ and
       !defined $app->request->params->{raw}
     ) {
       # disable layout

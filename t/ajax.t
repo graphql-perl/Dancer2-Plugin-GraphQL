@@ -44,7 +44,7 @@ subtest 'GraphQL with POST' => sub {
 subtest 'GraphiQL' => sub {
   my $res = $test->request(
     GET '/graphql',
-      Accept => 'text/html',
+      Accept => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
   );
   like $res->decoded_content, qr/React.createElement\(GraphiQL/, 'Content as expected';
 };
