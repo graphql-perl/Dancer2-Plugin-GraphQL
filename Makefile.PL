@@ -20,7 +20,8 @@ WriteMakefile(
     "Dancer2::Core::Types" => 0,
     "Dancer2::Plugin" => 0,
     "strict" => 0,
-    "warnings" => 0
+    "warnings" => 0,
+    "GraphQL" => '0.12',
   },
   "TEST_REQUIRES" => {
     "Dancer2" => "0.200000",
