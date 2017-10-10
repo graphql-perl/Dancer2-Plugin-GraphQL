@@ -5,11 +5,11 @@ use Plack::Test;
 use HTTP::Request::Common qw<GET POST DELETE PUT>;
 
 {
-    package AjaxApp;
+    package GraphQLApp;
     use Dancer2;
-    use Dancer2::Plugin::Ajax;
+    use Dancer2::Plugin::GraphQL;
 
-    set plugins => { 'Ajax' => { content_type => 'application/json' } };
+    set plugins => { 'GraphQL' => { content_type => 'application/json' } };
 
     ajax '/test' => sub {
         "{some: 'json'}";
@@ -28,9 +28,9 @@ use HTTP::Request::Common qw<GET POST DELETE PUT>;
     };
 }
 
-my $test = Plack::Test->create( AjaxApp->to_app );
+my $test = Plack::Test->create( GraphQLApp->to_app );
 
-subtest 'Ajax with POST' => sub {
+subtest 'GraphQL with POST' => sub {
     my $res = $test->request(
         POST '/test',
             'X-Requested-With' => 'XMLHttpRequest'

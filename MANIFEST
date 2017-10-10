@@ -1,5 +1,5 @@
 Changes
-lib/Dancer2/Plugin/Ajax.pm
+lib/Dancer2/Plugin/GraphQL.pm
 Makefile.PL
 MANIFEST
 t/00-compile.t

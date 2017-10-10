@@ -9,7 +9,7 @@ use Test::More;
 plan tests => 1 + ($ENV{AUTHOR_TESTING} ? 1 : 0);
 
 my @module_files = (
-    'Dancer2/Plugin/Ajax.pm'
+    'Dancer2/Plugin/GraphQL.pm'
 );
 
 

@@ -1,10 +1,11 @@
-package Dancer2::Plugin::Ajax;
-# ABSTRACT: a plugin for adding Ajax route handlers
-$Dancer2::Plugin::Ajax::VERSION = '0.300000';
+package Dancer2::Plugin::GraphQL;
+# ABSTRACT: a plugin for adding GraphQL route handlers
 use strict;
 use warnings;
 use Dancer2::Core::Types 'Str';
 use Dancer2::Plugin;
+
+our $VERSION = '0.300000';
 
 has content_type => (
     is => 'ro',
@@ -67,7 +68,7 @@ __END__
 
 =head1 NAME
 
-Dancer2::Plugin::Ajax - a plugin for adding Ajax route handlers
+Dancer2::Plugin::GraphQL - a plugin for adding GraphQL route handlers
 
 =head1 VERSION
 
@@ -78,7 +79,7 @@ version 0.300000
     package MyWebApp;
 
     use Dancer2;
-    use Dancer2::Plugin::Ajax;
+    use Dancer2::Plugin::GraphQL;
 
     # For GET / POST
     ajax '/check_for_update' => sub {
@@ -95,7 +96,7 @@ version 0.300000
 =head1 DESCRIPTION
 
 The C<ajax> keyword which is exported by this plugin allow you to define a route
-handler optimized for Ajax queries.
+handler optimized for GraphQL queries.
 
 The route handler code will be compiled to behave like the following:
 
@@ -123,16 +124,16 @@ with plugin setting 'content_type'.
 Here is example to use JSON:
 
   plugins:
-    Ajax:
+    GraphQL:
       content_type: 'application/json'
 
 =head1 AUTHOR
 
-Dancer Core Developers
+Ed J
+
+Based heavily on L<Dancer2::Plugin::Ajax> by "Dancer Core Developers".
 
 =head1 COPYRIGHT AND LICENSE
-
-This software is copyright (c) 2016 by Alexis Sukrieh.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
