@@ -2,6 +2,7 @@ Changes
 lib/Dancer2/Plugin/GraphQL.pm
 Makefile.PL
 MANIFEST
+README.md
 t/00-compile.t
 t/00-report-prereqs.t
 t/ajax.t

@@ -33,4 +33,39 @@ WriteMakefile(
     "Test::More" => "0.92",
     "blib" => "1.01"
   },
+  META_MERGE => {
+    "meta-spec" => { version => 2 },
+    dynamic_config => 0,
+    resources => {
+      x_IRC => 'irc://irc.perl.org/#graphql-perl',
+      repository => {
+        type => 'git',
+        url => 'git@github.com:graphql-perl/Dancer2-Plugin-GraphQL.git',
+        web => 'https://github.com/graphql-perl/Dancer2-Plugin-GraphQL',
+      },
+      bugtracker  => {
+        web => 'https://github.com/graphql-perl/Dancer2-Plugin-GraphQL/issues',
+      },
+      license => [ 'http://dev.perl.org/licenses/' ],
+    },
+    prereqs => {
+      develop => {
+        requires => {
+          'Test::CheckManifest' => '0.9',
+          'Test::Pod::Coverage' => '1.08',
+          'Test::Pod' => '1.22',
+          'Pod::Markdown' => 0,
+        },
+      },
+    },
+  },
 );
+
+sub MY::postamble {
+  <<EOF;
+pure_all :: README.md
+
+README.md : lib/Dancer2/Plugin/GraphQL.pm
+\tpod2markdown \$< >\$\@
+EOF
+}
