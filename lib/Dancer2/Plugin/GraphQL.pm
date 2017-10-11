@@ -49,7 +49,7 @@ plugin_keywords graphql => sub {
       $app->send_as(html => $result);
     }
     my $body = $JSON->decode($app->request->body);
-    $app->send_as(JSON => GraphQL::Execution->execute(
+    my $data = GraphQL::Execution->execute(
       $schema,
       $body->{'query'},
       $root_value,
@@ -57,7 +57,8 @@ plugin_keywords graphql => sub {
       $body->{'variables'},
       $body->{'operationName'},
       $field_resolver,
-    ));
+    );
+    $app->send_as(JSON => $data);
   };
   foreach my $method (@DEFAULT_METHODS) {
     $plugin->app->add_route(
