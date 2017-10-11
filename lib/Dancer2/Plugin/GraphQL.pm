@@ -52,18 +52,19 @@ sub _safe_serialize {
   return $json;
 }
 
-# DSL args after $pattern: $schema, $root_value, $resolver
+# DSL args after $pattern: $schema, $root_value, $resolver, $handler
 plugin_keywords graphql => sub {
   my ($plugin, $pattern, @rest) = @_;
-  my ($schema, $root_value, $field_resolver);
-  if (@rest == 3) {
-    ($schema, $root_value, $field_resolver) = @rest;
+  my ($schema, $root_value, $field_resolver, $handler);
+  if (@rest == 4) {
+    ($schema, $root_value, $field_resolver, $handler) = @rest;
   } else {
     ($schema, $root_value) = grep ref ne 'CODE', @rest;
     my @codes = grep ref eq 'CODE', @rest;
-    ($field_resolver) = @codes;
+    # if only one, is $handler
+    ($handler, $field_resolver) = reverse @codes;
+    $handler ||= make_code_closure($schema, $root_value, $field_resolver);
   }
-  my $handler = make_code_closure($schema, $root_value, $field_resolver);
   my $ajax_route = sub {
     my ($app) = @_;
     if (
@@ -72,21 +73,22 @@ plugin_keywords graphql => sub {
       !defined $app->request->params->{raw}
     ) {
       # disable layout
-      my $layout = $app->config->{'layout'};
-      $app->config->{'layout'} = undef;
+      my $layout = $app->config->{layout};
+      $app->config->{layout} = undef;
       my $result = $app->template(\$TEMPLATE, {
         title            => 'GraphiQL',
         graphiql_version => '0.11.2',
-        queryString      => _safe_serialize( $app->request->params->{'query'} ),
-        operationName    => _safe_serialize( $app->request->params->{'operationName'} ),
-        resultString     => _safe_serialize( $app->request->params->{'result'} ),
-        variablesString  => _safe_serialize( $app->request->params->{'variables'} ),
+        queryString      => _safe_serialize( $app->request->params->{query} ),
+        operationName    => _safe_serialize( $app->request->params->{operationName} ),
+        resultString     => _safe_serialize( $app->request->params->{result} ),
+        variablesString  => _safe_serialize( $app->request->params->{variables} ),
       });
-      $app->config->{'layout'} = $layout;
+      $app->config->{layout} = $layout;
       $app->send_as(html => $result);
     }
     my $body = $JSON->decode($app->request->body);
-    my $data = $handler->($app, $body, $EXECUTE);
+    my $data = eval { $handler->($app, $body, $EXECUTE) };
+    $data = { errors => [ { message => $@ } ] } if $@;
     $app->send_as(JSON => $data);
   };
   foreach my $method (@DEFAULT_METHODS) {
@@ -131,6 +133,39 @@ Dancer2::Plugin::GraphQL - a plugin for adding GraphQL route handlers
 
   dance;
 
+  # OR, equivalently:
+  graphql '/graphql' => $schema => sub {
+    my ($app, $body, $execute) = @_;
+    # returns JSON-able Perl data
+    $execute->(
+      $schema,
+      $body->{query},
+      undef, # $root_value
+      $app->request->headers,
+      $body->{variables},
+      $body->{operationName},
+      undef, # $field_resolver
+    );
+  };
+
+  # OR, with bespoke user-lookup and caching:
+  graphql '/graphql' => sub {
+    my ($app, $body, $execute) = @_;
+    my $user = MyStuff::User->lookup($app->request->headers->header('X-Token'));
+    die "Invalid user\n" if !$user; # turned into GraphQL { errors => [ ... ] }
+    my $cached_result = MyStuff::RequestCache->lookup($user, $body->{query});
+    return $cached_result if $cached_result;
+    MyStuff::RequestCache->cache_and_return($execute->(
+      $schema,
+      $body->{query},
+      undef, # $root_value
+      $user, # per-request info
+      $body->{variables},
+      $body->{operationName},
+      undef, # $field_resolver
+    ));
+  };
+
 =head1 DESCRIPTION
 
 The C<graphql> keyword which is exported by this plugin allow you to
@@ -152,7 +187,22 @@ An optional root value, passed to top-level resolvers.
 
 An optional field resolver, replacing the GraphQL default.
 
+=item $route_handler
+
+An optional route-handler, replacing the plugin's default - see example
+above for possibilities.
+
+It must return JSON-able Perl data in the GraphQL format, which is a hash
+with at least one of a C<data> key and/or an C<errors> key.
+
+If it throws an exception, that will be turned into a GraphQL-formatted
+error.
+
 =back
+
+If you supply two code-refs, they will be the C<$resolver> and
+C<$handler>. If you only supply one, it will be C<$handler>. To be
+certain, pass all four post-pattern arguments.
 
 The route handler code will be compiled to behave like the following:
 
@@ -160,7 +210,8 @@ The route handler code will be compiled to behave like the following:
 
 =item *
 
-Passes to the L<GraphQL> execute, the given schema, C<$root_value> and C<$field_resolver>.
+Passes to the L<GraphQL> execute, possibly via your supplied handler,
+the given schema, C<$root_value> and C<$field_resolver>.
 
 =item *
 

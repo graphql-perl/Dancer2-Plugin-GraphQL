@@ -27,6 +27,39 @@ Dancer2::Plugin::GraphQL - a plugin for adding GraphQL route handlers
 
     dance;
 
+    # OR, equivalently:
+    graphql '/graphql' => $schema => sub {
+      my ($app, $body, $execute) = @_;
+      # returns JSON-able Perl data
+      $execute->(
+        $schema,
+        $body->{query},
+        undef, # $root_value
+        $app->request->headers,
+        $body->{variables},
+        $body->{operationName},
+        undef, # $field_resolver
+      );
+    };
+
+    # OR, with bespoke user-lookup and caching:
+    graphql '/graphql' => sub {
+      my ($app, $body, $execute) = @_;
+      my $user = MyStuff::User->lookup($app->request->headers->header('X-Token'));
+      die "Invalid user\n" if !$user; # turned into GraphQL { errors => [ ... ] }
+      my $cached_result = MyStuff::RequestCache->lookup($user, $body->{query});
+      return $cached_result if $cached_result;
+      MyStuff::RequestCache->cache_and_return($execute->(
+        $schema,
+        $body->{query},
+        undef, # $root_value
+        $user, # per-request info
+        $body->{variables},
+        $body->{operationName},
+        undef, # $field_resolver
+      ));
+    };
+
 # DESCRIPTION
 
 The `graphql` keyword which is exported by this plugin allow you to
@@ -46,9 +79,25 @@ Parameters, after the route pattern:
 
     An optional field resolver, replacing the GraphQL default.
 
+- $route\_handler
+
+    An optional route-handler, replacing the plugin's default - see example
+    above for possibilities.
+
+    It must return JSON-able Perl data in the GraphQL format, which is a hash
+    with at least one of a `data` key and/or an `errors` key.
+
+    If it throws an exception, that will be turned into a GraphQL-formatted
+    error.
+
+If you supply two code-refs, they will be the `$resolver` and
+`$handler`. If you only supply one, it will be `$handler`. To be
+certain, pass all four post-pattern arguments.
+
 The route handler code will be compiled to behave like the following:
 
-- Passes to the [GraphQL](https://metacpan.org/pod/GraphQL) execute, the given schema, `$root_value` and `$field_resolver`.
+- Passes to the [GraphQL](https://metacpan.org/pod/GraphQL) execute, possibly via your supplied handler,
+the given schema, `$root_value` and `$field_resolver`.
 - The action built matches POST / GET requests.
 - Returns GraphQL results in JSON form.
 
