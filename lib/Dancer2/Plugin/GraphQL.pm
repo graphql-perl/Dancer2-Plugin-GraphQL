@@ -16,6 +16,33 @@ has graphiql => (
 
 my @DEFAULT_METHODS = qw(get post);
 my $TEMPLATE = join '', <DATA>;
+my $EXECUTE = sub {
+  my ($schema, $query, $root_value, $per_request, $variables, $operationName, $field_resolver) = @_;
+  GraphQL::Execution->execute(
+    $schema,
+    $query,
+    $root_value,
+    $per_request,
+    $variables,
+    $operationName,
+    $field_resolver,
+  );
+};
+sub make_code_closure {
+  my ($schema, $root_value, $field_resolver) = @_;
+  sub {
+    my ($app, $body, $execute) = @_;
+    $execute->(
+      $schema,
+      $body->{query},
+      $root_value,
+      $app->request->headers,
+      $body->{variables},
+      $body->{operationName},
+      $field_resolver,
+    );
+  };
+};
 
 my $JSON = JSON::MaybeXS->new->utf8->allow_nonref;
 sub _safe_serialize {
@@ -25,8 +52,18 @@ sub _safe_serialize {
   return $json;
 }
 
+# DSL args after $pattern: $schema, $root_value, $resolver
 plugin_keywords graphql => sub {
-  my ( $plugin, $pattern, $schema, $root_value, $field_resolver ) = @_;
+  my ($plugin, $pattern, @rest) = @_;
+  my ($schema, $root_value, $field_resolver);
+  if (@rest == 3) {
+    ($schema, $root_value, $field_resolver) = @rest;
+  } else {
+    ($schema, $root_value) = grep ref ne 'CODE', @rest;
+    my @codes = grep ref eq 'CODE', @rest;
+    ($field_resolver) = @codes;
+  }
+  my $handler = make_code_closure($schema, $root_value, $field_resolver);
   my $ajax_route = sub {
     my ($app) = @_;
     if (
@@ -49,15 +86,7 @@ plugin_keywords graphql => sub {
       $app->send_as(html => $result);
     }
     my $body = $JSON->decode($app->request->body);
-    my $data = GraphQL::Execution->execute(
-      $schema,
-      $body->{'query'},
-      $root_value,
-      $app->request->headers,
-      $body->{'variables'},
-      $body->{'operationName'},
-      $field_resolver,
-    );
+    my $data = $handler->($app, $body, $EXECUTE);
     $app->send_as(JSON => $data);
   };
   foreach my $method (@DEFAULT_METHODS) {
