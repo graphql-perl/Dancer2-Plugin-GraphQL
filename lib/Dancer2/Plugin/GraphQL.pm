@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use Dancer2::Core::Types qw(Bool);
 use Dancer2::Plugin;
-use GraphQL::Execution;
+use GraphQL::Execution qw(execute);
 
 our $VERSION = '0.02';
 
@@ -18,7 +18,7 @@ my @DEFAULT_METHODS = qw(get post);
 my $TEMPLATE = join '', <DATA>;
 my $EXECUTE = sub {
   my ($schema, $query, $root_value, $per_request, $variables, $operationName, $field_resolver) = @_;
-  GraphQL::Execution->execute(
+  execute(
     $schema,
     $query,
     $root_value,
