@@ -6,7 +6,7 @@ use Dancer2::Core::Types qw(Bool);
 use Dancer2::Plugin;
 use GraphQL::Execution qw(execute);
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 has graphiql => (
   is => 'ro',
