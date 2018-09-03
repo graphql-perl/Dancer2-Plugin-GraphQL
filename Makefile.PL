@@ -66,7 +66,7 @@ sub MY::postamble {
   <<EOF;
 pure_all :: README.md
 
-README.md : lib/Dancer2/Plugin/GraphQL.pm
+README.md : \$(VERSION_FROM)
 \tpod2markdown \$< >\$\@
 EOF
 }
