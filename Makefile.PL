@@ -19,6 +19,7 @@ WriteMakefile(
     "Dancer2" => "0.200000",
     "Dancer2::Core::Types" => 0,
     "Dancer2::Plugin" => 0,
+    "Module::Runtime" => 0,
     "strict" => 0,
     "warnings" => 0,
     "GraphQL" => '0.20', # convert plugin
