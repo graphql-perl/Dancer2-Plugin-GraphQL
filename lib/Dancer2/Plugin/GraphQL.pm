@@ -7,7 +7,7 @@ use Dancer2::Plugin;
 use GraphQL::Execution qw(execute);
 use Module::Runtime qw(require_module);
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 has graphiql => (
   is => 'ro',
