@@ -1,4 +1,4 @@
-Revision history for Dancer2::Plugin::GraphQL
+- add our handler when a ::Convert supplies a resolver - thanks @schroeer for report
 
 0.07 2019-04-11
  - update deps - thanks @manwar!

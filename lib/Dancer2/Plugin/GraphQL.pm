@@ -63,6 +63,7 @@ plugin_keywords graphql => sub {
     require_module $class;
     my $converted = $class->to_graphql(@values);
     unshift @rest, @{$converted}{qw(schema root_value resolver)};
+    push @rest, make_code_closure(@rest[0..2]) if @rest < 4;
   }
   if (@rest == 4) {
     ($schema, $root_value, $field_resolver, $handler) = @rest;
